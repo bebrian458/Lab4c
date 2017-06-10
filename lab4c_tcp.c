@@ -319,6 +319,8 @@ int main(int argc, char *argv[]){
     	exit(1);
     }
 
+    fprintf(stderr, "Established a connection to server. Sending reports...\n");
+
     // Create ID buffer
     char id_buffer[14] = "ID=";
     const char newline[2] = "\n";
@@ -397,7 +399,7 @@ int main(int argc, char *argv[]){
 	        	}
 
 	        	// Output to stdout
-	            fprintf(stdout, "%s %.1f\n", time_disp, celsius);
+	            // fprintf(stdout, "%s %.1f\n", time_disp, celsius);
 	        }
 	        else{
 
@@ -414,7 +416,7 @@ int main(int argc, char *argv[]){
 	        	}
 
 	        	// Output to stdout
-	            fprintf(stdout, "%s %.1f\n", time_disp, fahrenheit);
+	            // fprintf(stdout, "%s %.1f\n", time_disp, fahrenheit);
 	        }
 
 	        // Generate report to logfile 
