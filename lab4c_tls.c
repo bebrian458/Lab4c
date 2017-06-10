@@ -297,7 +297,7 @@ int main(int argc, char *argv[]){
 
     /* TCP Server */
     // Initialize socket
-    if(argc != 2){
+    if(argv[optind] == NULL){
     	fprintf(stderr, "Not enough arguments. Please give a valid portnumber.\n");
     	exit(1);
     }
