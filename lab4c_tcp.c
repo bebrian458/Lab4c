@@ -37,7 +37,7 @@ struct tm* converted_time_info;
 char *time_disp;
 
 // Socket
-char *opt_id = "323227654";
+char *opt_id = "204612203";
 char *hostname = "131.179.192.136";
 int portno, sockfd;
 struct sockaddr_in serv_addr;
@@ -435,6 +435,9 @@ int main(int argc, char *argv[]){
         sleep(opt_period);
     }
 
+    // Close everything
     mraa_aio_close(pinTempSensor);
+    close(sockfd);
+
     return 0;
 }
