@@ -327,9 +327,10 @@ int main(int argc, char *argv[]){
     }
 
     /* TLS Server */
-    // SSL_library_init();
-    // SSL_load_error_strings();
-    // OpenSSL_add_all_algorithms();
+    // Initialize TLS
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
     
     // Create an object as a framework to establish TLS/SSL enabled connections
     SSL_CTX* SSLClient = SSL_CTX_new(TLSv1_client_method());
@@ -354,7 +355,7 @@ int main(int argc, char *argv[]){
     strcat(id_buffer, newline);
 
     // First message sent to server should be ID buffer
-    if (write(sockfd, id_buffer, 14) < 0){
+    if (SSL_write(ssl, id_buffer, 14) < 0){
     	fprintf(stderr, "Error writing ID to server\n");
     	exit(1);
     }

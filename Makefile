@@ -5,7 +5,7 @@
 CC = gcc
 CFLAGS = 
 DEBUG =
-LDLIBS = -lmraa -lm -lpthread
+LDLIBS = -lmraa -lm -lpthread -lssl -lcrypto
 DIST = lab4c_tcp.c lab4c_tls.c Makefile README
 
 default: lab4c_tcp lab4c_tls
