@@ -3,16 +3,21 @@ EMAIL:	bebrian458@gmail.com
 ID: 	204612203
 
 // Overview
-lab4b.c
-	The source code to create the program lab4b, which uses the aio and gpio APIs with the 
+lab4c_tcp.c
+	The source code to create the program lab4c_tcp, which uses the aio and gpio APIs with the 
 	Edison to sample temperature and button presses. This program generates reports based 
 	on a user specified frequency. The user also has the option to change temperature scales, 
-	toggle temperature reports, and shut it down during exectuion of the program.
+	toggle temperature reports, and shut it down during execution of the program. The generated
+	reports are sent to a server via a socket and port number 18000. The program is also able to
+	receive and process commands from the server, changing the output of the reports.
+
+lab4c_tls.c
+	Same as lab4c_tcp.c but different in that this program communicates with the server (port 
+	number 19000) via encrypted messages. This includes encrypted time and temperature reports,
+	as well as the commands. 
 
 Makefile
-	default ... build your program
-	check 	... execute an automated smoke-test of your application to see if it runs and can 
-				talk to its sensors actuators.
+	default ... builds both tcp and tls programs
 	clean 	... delete all generated programs and output
 	dist 	... (runnable on a Linux desktop or server) create the deliverable tarball
 
@@ -20,6 +25,6 @@ make_check.sh
 	The shell script that is used in make check to execute smoke tests.
 
 
-// Research
+// Sources
 Used powerpoint and discussion for tips on how to use aio and gpio
 Used man pages, stack overflow, and piazza for syntax help and logic flow
