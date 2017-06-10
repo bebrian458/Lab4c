@@ -13,7 +13,12 @@
 #include <time.h>
 #include <poll.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/types.h> // for socks
+#include <netdb.h>
 
+// Constants
 const int B = 4275;               	// B value of the thermistor
 const int R0 = 100000;            	// R0 = 100k
 const int TIME_DISP_SIZE = 9;		// HH:MM:SS\0
@@ -31,11 +36,17 @@ time_t timer;
 struct tm* converted_time_info;
 char *time_disp;
 
+// Socket
+char *opt_id = "323227654";
+char *hostname = "131.179.192.136";
+int portno, sockfd;
+struct sockaddr_in serv_addr;
+struct hostent *server;
+
 
 void check_period(char *optarg){
     if(!isdigit(*optarg) || opt_period < 0){
         fprintf(stderr, "Invalid option argument for period. Please use an integer greater than 0 or default value of 1 second\n");
-        fprintf(stderr, "%d\n", opt_period);
         exit(1);
     }
 }
@@ -52,6 +63,24 @@ void check_logfile(){
         fprintf(stderr, "Error creating or opening\n");
         exit(1);
     }
+}
+
+void check_id(){
+
+	// Check length of ID
+	if(strlen(opt_id) != 9){
+		fprintf(stderr, "Invalid ID number. Please enter a 9-digit number\n");
+		exit(1);
+	}
+
+	// Check if each character is a valid digit
+	int i;
+	for(i = 0; i < 9; i++){
+		if(!isdigit(opt_id[i])){
+        	fprintf(stderr, "Not all ID characters are valid numbers. Please enter a 9-digit number\n");
+        	exit(1);
+        }
+	}
 }
 
 void* check_btn(){
@@ -87,7 +116,7 @@ void* check_cmd(){
 
 	// Initialize poll for STDIN
 	struct pollfd fds[1];
-	fds[0].fd = 0;
+	fds[0].fd = sockfd;
 	fds[0].events = 0;
 	fds[0].events = POLLIN | POLLHUP | POLLERR;
 
@@ -111,7 +140,7 @@ void* check_cmd(){
 			char input_buffer[SIZE_BUFFER];
 			int input_index = 0;
 
-			ssize_t bytes_read = read(0, input_buffer, SIZE_BUFFER);
+			ssize_t bytes_read = read(sockfd, input_buffer, SIZE_BUFFER);
 
 			// Read the buffer one byte at a time
 			while(bytes_read > 0 && input_index < bytes_read){
@@ -226,6 +255,8 @@ int main(int argc, char *argv[]){
         {"period",  required_argument,  NULL, 'p'},
         {"scale",   required_argument,  NULL, 's'},
         {"log",     required_argument,  NULL, 'l'},
+        {"id",		required_argument,	NULL, 'i'},
+        {"host",	required_argument, 	NULL, 'h'},
         {0,0,0,0}
     };
 
@@ -244,6 +275,13 @@ int main(int argc, char *argv[]){
                 logfile =  fopen(optarg, "w");
                 check_logfile();
                 break;
+            case 'i':
+            	opt_id = optarg;
+            	check_id();
+            	break;
+            case 'h':
+            	hostname = optarg;
+            	break;
             default:
                 fprintf(stderr, "Invalid Arguments. Usage: ./lab4b --period=time_in_secs --scale=[FP] --log=filename\n");
                 exit(1);
@@ -251,6 +289,43 @@ int main(int argc, char *argv[]){
         }
     }
 
+    // Initialize socket
+    portno = atoi(argv[optind]);
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0){
+    	fprintf(stderr, "Error opening socket\n");
+    	exit(1);
+    }
+
+    server = gethostbyname(hostname);
+	if ( server == NULL ){
+		fprintf(stderr, "Error: Invalid hostname.\n");
+		exit(1);
+	}
+
+    memset((char*)&serv_addr, 0, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    memmove(((char*)&serv_addr.sin_addr.s_addr), (char*)server->h_addr, server->h_length);
+    serv_addr.sin_port = htons(portno);
+
+    // Attempt to connect to server
+    if(connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr))){
+    	fprintf(stderr, "Error connecting to server\n");
+    	exit(1);
+    }
+
+    // Create ID buffer
+    char id_buffer[14] = "ID=";
+    const char newline[2] = "\n";
+    strcat(id_buffer, opt_id);
+    strcat(id_buffer, newline);
+
+    // First message sent to server should be ID buffer
+    if (write(sockfd, id_buffer, 14) < 0){
+    	fprintf(stderr, "Error writing ID to server\n");
+    	exit(1);
+    }
 
     // Initialize Grove - Temperature Sensor connect to A0
     mraa_aio_context pinTempSensor = mraa_aio_init(0);
@@ -297,15 +372,46 @@ int main(int argc, char *argv[]){
         double celsius = 1.0/(log(R/R0)/B+1/298.15)-273.15; // convert to celsius temperature via datasheet
         double fahrenheit = celsius * 9/5 + 32;
 
+        char server_report[64];
+
         // START and STOP commands toggle report generation
 	    if(cmd_report){    
 
 	    	// Generate report to stdout
-	        if(opt_scale == 'C'){  
+	        if(opt_scale == 'C'){
+
+	        	// Concatenate time and temp into server report
+	        	if(snprintf(server_report, 64, "%s %.1f\n", time_disp, celsius) < 0){
+	        		fprintf(stderr, "Error storing string into server_report\n");
+	        		exit(1);
+	        	}
+
+	        	// Send report to server
+	        	if(write(sockfd, server_report, strlen(server_report)+1) < 0){
+	        		fprintf(stderr, "Error writing server_report to server\n");
+	        		exit(1);
+	        	}
+
+	        	// Output to stdout
 	            fprintf(stdout, "%s %.1f\n", time_disp, celsius);
 	        }
-	        else
+	        else{
+
+	        	// Concatenate time and temp into server report
+	        	if(snprintf(server_report, 64, "%s %.1f\n", time_disp, fahrenheit) < 0){
+	        		fprintf(stderr, "Error storing string into server_report\n");
+	        		exit(1);
+	        	}
+
+	        	// Send report to server
+	        	if(write(sockfd, server_report, strlen(server_report)+1) < 0){
+	        		fprintf(stderr, "Error writing server_report to server\n");
+	        		exit(1);
+	        	}
+
+	        	// Output to stdout
 	            fprintf(stdout, "%s %.1f\n", time_disp, fahrenheit);
+	        }
 
 	        // Generate report to logfile 
 	        if(opt_log){
