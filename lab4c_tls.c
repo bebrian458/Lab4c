@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 #include <sys/types.h> // for socks
 #include <netdb.h>
+#include <openssl/ssl.h>
 
 // Constants
 const int B = 4275;               	// B value of the thermistor
@@ -36,12 +37,15 @@ time_t timer;
 struct tm* converted_time_info;
 char *time_disp;
 
-// Socket
+// TCP - Socket
 char *opt_id = "323227654";
 char *hostname = "131.179.192.136";
 int portno, sockfd;
 struct sockaddr_in serv_addr;
 struct hostent *server;
+
+// TLS
+SSL* ssl;
 
 
 void check_period(char *optarg){
@@ -140,7 +144,9 @@ void* check_cmd(){
 			char input_buffer[SIZE_BUFFER];
 			int input_index = 0;
 
-			ssize_t bytes_read = read(sockfd, input_buffer, SIZE_BUFFER);
+			//ssize_t bytes_read = read(sockfd, input_buffer, SIZE_BUFFER);
+			ssize_t bytes_read = SSL_read(ssl, input_buffer, SIZE_BUFFER);
+
 
 			// Read the buffer one byte at a time
 			while(bytes_read > 0 && input_index < bytes_read){
@@ -289,6 +295,7 @@ int main(int argc, char *argv[]){
         }
     }
 
+    /* TCP Server */
     // Initialize socket
     if(argc != 2){
     	fprintf(stderr, "Not enough arguments. Please give a valid portnumber.\n");
@@ -316,6 +323,27 @@ int main(int argc, char *argv[]){
     // Attempt to connect to server
     if(connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr))){
     	fprintf(stderr, "Error connecting to server\n");
+    	exit(1);
+    }
+
+    /* TLS Server */
+    // SSL_library_init();
+    // SSL_load_error_strings();
+    // OpenSSL_add_all_algorithms();
+    
+    // Create an object as a framework to establish TLS/SSL enabled connections
+    SSL_CTX* SSLClient = SSL_CTX_new(TLSv1_client_method());
+    ssl = SSL_new(SSLClient);
+
+    // Set sockfd as the input/output facility for TLS/SSL (encrypted) side of ssl
+    if(SSL_set_fd(ssl, sockfd) == 0){
+    	fprintf(stderr, "Error assigning sockfd as input/output for SSL\n");
+    	exit(1);
+    }
+
+    // Initiate TLS/SSL handshake with an TLS/SSL server
+    if(SSL_connect(ssl) != 1){
+    	fprintf(stderr, "Error initiating the TLS/SSL handshake\n");
     	exit(1);
     }
 
@@ -391,7 +419,8 @@ int main(int argc, char *argv[]){
 	        	}
 
 	        	// Send report to server
-	        	if(write(sockfd, server_report, strlen(server_report)+1) < 0){
+	        	// if(write(sockfd, server_report, strlen(server_report)+1) < 0){
+	        	if(SSL_write(ssl, server_report, strlen(server_report)+1) < 0){
 	        		fprintf(stderr, "Error writing server_report to server\n");
 	        		exit(1);
 	        	}
@@ -408,7 +437,8 @@ int main(int argc, char *argv[]){
 	        	}
 
 	        	// Send report to server
-	        	if(write(sockfd, server_report, strlen(server_report)+1) < 0){
+	        	// if(write(sockfd, server_report, strlen(server_report)+1) < 0){
+	        	if(SSL_write(ssl, server_report, strlen(server_report)+1) < 0){
 	        		fprintf(stderr, "Error writing server_report to server\n");
 	        		exit(1);
 	        	}
@@ -433,6 +463,10 @@ int main(int argc, char *argv[]){
         sleep(opt_period);
     }
 
+    // Close everything
     mraa_aio_close(pinTempSensor);
+    close(sockfd);
+    SSL_shutdown(ssl);
+
     return 0;
 }

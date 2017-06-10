@@ -6,19 +6,19 @@ CC = gcc
 CFLAGS = 
 DEBUG =
 LDLIBS = -lmraa -lm -lpthread
-DIST = lab4b.c Makefile README make_check.sh
+DIST = lab4c_tcp.c lab4c_tls.c Makefile README
 
-default: lab4c_tcp
+default: lab4c_tcp lab4c_tls
 
 lab4c_tcp: lab4c_tcp.c
 	$(CC) $(LDLIBS) -o $@ $<
 
-check: default
-	@./make_check.sh
+lab4c_tls: lab4c_tls.c
+	$(CC) $(LDLIBS) -o $@ $<
 
 clean:
-	rm -f lab4c_tcp *.tar.gz
+	rm -f lab4c_tcp lab4c_tls *.tar.gz
 
 dist:
-	tar -czf lab4b-204612203.tar.gz $(DIST)
+	tar -czf lab4c-204612203.tar.gz $(DIST)
 
